@@ -12,6 +12,10 @@ wpa_supplicant -h
 ```
 
 3. Use wpa_passphrase to register a SSID/pwd pair in a configuration
+```
+wpa_passphrase "SSID" > /etc/wpa_supplicant.conf
+> input password to the SSID...
+```
 
 
 ## GenCtagsAndCscope.sh
