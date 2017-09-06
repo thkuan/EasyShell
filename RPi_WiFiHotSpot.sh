@@ -30,26 +30,36 @@ do
     iptables -t $tb -Z
 done
 
-# Phase 1 (WIRELESS ROUTER): 
+# Phase 1 (CAPTIVE PORTAL):
+# 1) Add a new user-defined chain, WHITELIST, into the mangle table
+iptables -t mangle -N WHITELIST
+# 2) PREROUTE any packets into WHITELIST chain in the mangle table
+iptables -t mangle -A PREROUTING -j WHITELIST
+# 3) MARK all packets through  WHITELIST cahin with 0xDEAD value in the mangle table
+iptables -t mangle -A WHITELIST --in-interface $IN_IFACE -j MARK --set-xmark 0xDEAD/0xFFFFFFFF
+# 4) DROP any packets with DEAD value of the FORWARD chain in the filter table
+iptables -t filter -A FORWARD --in-interface $IN_IFACE -m mark --mark 0xDEAD -j DROP
+# 5)
+iptables -t mangle -I WHITELIST 1 --in-interface $IN_IFACE -m mac --mac-source 00:55:66:DE:AD:BE -j RETURN
+# or add IP in white list
+#iptables -t mangle -I WHITELIST 1 --in-interface $IN_IFACE --source 192.168.112.3/24 -j RETURN
+iptables -t mangle -I WHITELIST 1 --in-interface $IN_IFACE -m mac --mac-source 08:62:66:B5:7A:C0 -j RETURN
+
+
+# Phase 2 (WIRELESS ROUTER): 
 # use ipatbles forwarding and masquerading for NAT, 
 # and must set net.ipv4.ip_forward=1 in /etc/sysctl.conf
-# 1.) Change policy on FORWARD chain of the filter table to "DROP"
+# 1) Change policy on FORWARD chain of the filter table to "DROP"
 iptables -t filter -P FORWARD DROP
-# 2.) Select the filter table and append a rule to FOWARD chain: 
+# 2) Select the filter table and append a rule to FOWARD chain: 
 #     ACCEPT any packets with specified source from $IN_IFACE to $OUT_IFACE 
 iptables -t filter -A FORWARD --source $SUBNET --in-interface $IN_IFACE --out-interface $OUT_IFACE -j ACCEPT
-# 3.) Select the filter table and append a rule to FOWARD chain: 
+# 3) Select the filter table and append a rule to FOWARD chain: 
 #     ACCEPT any packets with specified destionation which matched 
 #     ESTABLISHED,RELATED state from $OUT_IFACE to $IN_IFACE 
-iptables -t filter -A FORWARD --destination $SUBNET --in-interface $OUT_IFACE --out-interface $IN_IFACE --match state --state ESTABLISHED,RELATED -j ACCEPT
-# 4.) Select the nat table and append a rule to POSTROUTING chain: 
+iptables -t filter -A FORWARD --destination $SUBNET --in-interface $OUT_IFACE --out-interface $IN_IFACE --match state --state RELATED,ESTABLISHED -j ACCEPT
+# 4) Select the nat table and append a rule to POSTROUTING chain: 
 #     MASQUERADE any packets with specified source that is going out $OUT_IFACE 
 iptables -t nat -A POSTROUTING --source $SUBNET --out-interface $OUT_IFACE -j MASQUERADE
 
-# Phase 2 (CAPTIVE PORTAL):
-# add a new user-defined chain in mangle table
-##iptables -t mangle -N internet
-##iptables -t mangle -A PREROUTING -i $IN_IFACE -p tcp -m tcp --dport 80 -j internet
-##iptables -t mangle -A internet -j MARK --set-mark 99
-##iptables -t nat -A PREROUTING -i $IN_IFACE -p tcp -m mark --mark 99 -m tcp --dport 80 -j DNAT --to-destination $REDIRPAGE
 ##iptables -t nat -A PREROUTING -i $IN_IFACE -p tcp -m mark --mark 99 -m tcp --dport 443 -j DNAT --to-destination $REDIRPAGE
